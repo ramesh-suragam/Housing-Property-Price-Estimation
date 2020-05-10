@@ -1,0 +1,265 @@
+---
+title: "HousingProject2"
+author: "Ramesh Suragam Alok Kumar Nishant Kumar Pawan Rakesh"
+date: "5/10/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Property Cost Project
+### Read the data
+```{r}
+library(MASS)
+LondonData <- read.csv("data/DataScienceProj.csv",stringsAsFactors=FALSE)
+print(dim(LondonData))
+head(LondonData)
+str(LondonData)
+summary(LondonData)
+boxplot(LondonData$Purprice)
+LondonData <- LondonData[LondonData$Purprice < 600000,]
+boxplot(LondonData$Purprice)
+```
+
+
+
+### suspicious values for RetiPct, Unemploy
+### large hosues costs more
+```{r}
+plot(LondonData[,c("FlorArea","Purprice")],pch=16,cex=0.5)
+lines(lowess(LondonData[,c("FlorArea","Purprice")]),col="red")
+```
+
+### Convert dummies to factors
+###  - more convenient for modelling  -
+```{r}
+Dummy2Factor <- function(mat,lev1="Level1") {
+      mat <- as.matrix(mat)
+      factor((mat %*% (1:ncol(mat))) + 1,
+          labels = c(lev1, colnames(mat)))
+}
+
+Age      <- Dummy2Factor(LondonData[,5:9],"PreWW1")
+Type     <- Dummy2Factor(LondonData[,10:12],"Others")
+Garage   <- Dummy2Factor(LondonData[,13:14],"HardStnd")
+Bedrooms <- Dummy2Factor(LondonData[,18:21],"BedOne")
+
+MyData <- data.frame(LondonData[,c(2:4,15:17,22,23,26)],Age,Type,Garage,Bedrooms)
+summary(MyData)
+```
+
+### LondonData is the original
+### MyData has the factor-ed versions
+
+### explore
+```{r}
+boxplot(Purprice~CenHeat,data=MyData)
+boxplot(Purprice~BathTwo,data=MyData)
+boxplot(Purprice~Age,data=MyData)
+boxplot(Purprice~Type,data=MyData)
+boxplot(Purprice~Garage,data=MyData)
+boxplot(Purprice~Bedrooms,data=MyData)
+```
+
+### Fit models for a single variable and look at AICs
+###  - model with *lowest* AIC is closest to unknown 'true' model
+```{r}
+AICs <- rep(NA,10)
+Models <- vector("list",10)
+Vars <- colnames(MyData)[4:13]
+for(i in 1:10) {
+      Models[[i]] <- lm(formula(paste0("Purprice~",Vars[i])),data=MyData)
+      AICs[i] <- AIC(Models[[i]])
+}
+print(AICs)
+minAIC <- which.min(AICs)
+print(AICs[minAIC])
+print(Vars[minAIC])
+summary(Models[[minAIC]])
+```
+
+### have a look at the differences
+```{r}
+names(AICs) <- Vars                         # add names
+sAICs <- sort(AICs)                         # sort into order
+print(sAICs)
+plot(sAICs,xaxt="n")                        # plot
+axis(1,labels=names(sAICs),at=1:length(Vars),las=2,cex.axis=.75)
+
+for(i in 2:length(Vars)){                    # compute differences
+   cat(paste(names(sAICs)[i],sAICs[i]-sAICs[i-1],"\n"))
+}
+```
+
+### So the model with the lowest AIC is FlorArea - most variables add a little something
+```{r}
+model.9v <- lm(Purprice~FlorArea+Bedrooms+Type+BathTwo+Garage+Tenfree+CenHeat+Age+ProfPct,data=MyData)
+summary(model.9v)    # adj r^2 ~ .56
+```
+
+### plot simple map
+```{r}
+library(classInt)
+library(RColorBrewer)
+
+nClass = 10
+Palette <- rev(brewer.pal(nClass,"Spectral"))
+Classes <- classIntervals(MyData$Purprice,nClass,"quantile")
+Colours <- findColours(Classes,Palette)
+plot(MyData$Easting,MyData$Northing,pch=16,cex=0.25,col=Colours,asp=1)
+```
+
+### Geography - look at trends with linear and quadratic trend surfaces
+```{r}
+x <- MyData$Easting/1000
+y <- MyData$Northing/1000
+m.tr1 <- lm(Purprice~x+y,data=MyData)
+AIC(m.tr1)
+m.tr2 <- lm(Purprice~x+y+I(x^2)+I(y^2)+I(x*y),data=MyData)
+AIC(m.tr2)
+summary(m.tr1) # lower prices as we move east, slightly lower as w move south
+summary(m.tr2) # lower AIC # higher price as we move west
+stepAIC(m.tr2)
+```
+
+### Explore variation by borough  - first load the data
+```{r}
+library(rgdal)
+library(rgeos)
+LB <- readOGR(dsn="LondonBoroughs",layer="LondonBoroughs",stringsAsFactors=FALSE)  # Boroughs
+LH <- SpatialPointsDataFrame(MyData[,1:2],MyData)                     # Houses
+proj4string(LH) <- CRS(proj4string(LB))                               # copy CRS
+plot(LB)
+points(LH,pch=16,cex=0.5)
+box()
+```
+
+### Add Brough names to data  - explore by type and borough - we'll need to do an overlay
+```{r}
+LHLB <- over(LH,LB)   # spatial join: points first, then polygons
+dim(LHLB)
+head(LHLB)            # data frame has LB attributes in LH order
+MyData$Borough <- gsub(" London Boro","",LHLB$NAME)  # get the borough name
+
+boxplot(Purprice~Borough,data=MyData)
+
+Boroughs <- names(table(MyData$Borough))
+NB <- length(Boroughs)
+boxplot(log(Purprice)~Borough,data=MyData,outpch=16,outcol="red",outcex=0.75,xaxt="n")
+axis(1,labels=Boroughs,at=1:NB,cex.axis=0.75,las=2)
+title("Log(Price) by Borough")
+
+boxplot(log(Purprice)~Borough,data=MyData[MyData$Type=="TypSemiD",],outpch=16,outcol="red",outcex=0.75,xaxt="n")
+axis(1,labels=Boroughs,at=1:NB,cex.axis=0.75,las=2)
+title("Log(Price) by Borough (Semi Detached only")
+
+boxplot(log(Purprice)~Borough,data=MyData[MyData$Type=="TypFlat",],outpch=16,outcol="red",outcex=0.75,xaxt="n")
+axis(1,labels=Boroughs,at=1:NB,cex.axis=0.75,las=2)
+title("Log(Price) by Borough (Flats only")
+```
+
+### Ordered boxplot
+```{r}
+b.order <- rank(tapply(MyData$Purprice+runif(nrow(MyData)),MyData$Borough,median))
+
+boxplot(Purprice~Borough,data=MyData,outpch=16,outcol="red",outcex=0.75,xaxt="n",at=b.order,ylim=c(0,500000))
+axis(1,labels=Boroughs,at=b.order,cex.axis=0.75,las=2)
+title("Price by Borough")
+
+
+boxplot(log(Purprice)~Borough,data=MyData,outpch=16,outcol="red",outcex=0.75,xaxt="n",at=b.order)
+axis(1,labels=Boroughs,at=b.order,cex.axis=0.75,las=2)
+title("Log(Price) by Borough")
+```
+
+### standardsed residuals -s there a apttern
+```{r}
+MyData$stdres.9v <- stdres(model.9v)
+boxplot(stdres.9v~Borough,data=MyData,outpch=16,outcol="red",outcex=0.75,xaxt="n")
+axis(1,labels=Boroughs,at=1:NB,cex.axis=0.75,las=2)
+title("Standardised Residual by Borough")
+
+boxplot(stdres.9v~Borough,data=MyData,outpch=16,outcol="red",outcex=0.75,xaxt="n",ylim=c(-5,5))
+axis(1,labels=Boroughs,at=1:NB,cex.axis=0.75,las=2)
+title("Standardised Residual by Borough")
+abline(h=0,lty=2)
+```
+
+### y-yhat negative : overproediction
+### y-yhat positive : underprediction
+```{r}
+b.order.9v <- rank(tapply(MyData$stdres.9v+runif(nrow(MyData))*0.0001,MyData$Borough,median))
+boxplot(stdres.9v~Borough,data=MyData,outpch=16,outcol="red",outcex=0.75,xaxt="n",at=b.order.9v,ylim=c(-5,5))
+axis(1,labels=Boroughs,at=b.order.9v,cex.axis=0.75,las=2)
+title("Standardised Residual by Borough")
+abline(h=0,lty=2)
+```
+
+### Map of Boroughs with names
+```{r}
+head(LB$NAME)
+Bname <- gsub(" London Boro","",LB$NAME)
+xy <- coordinates(LB)
+plot(LB)
+text(xy[,1],xy[,2],Bname,col="blue",cex=0.5)
+box()
+title("London Borough Boundaries")
+
+quickMap <- function(Var,nClass=10){
+   require(classInt)
+   require(RColorBrewer)
+   Classes <- classIntervals(Var,nClass,method="quantile")
+   Palette <- brewer.pal(nClass,"Reds")
+   Colours <- findColours(Classes,Palette)
+   plot(y)
+   points(x.sdf2,cex=0.5,pch=16,col=Colours)
+   }
+```
+
+### How about some borough specific models
+```{r}
+ data.frame(Bname,LB$NAME)                   # check ordering of names
+ head(MyData)                                # and MyData
+ NB <- length(LB)                            # number of boroughs
+ results <- matrix(0,NB,2)                   # storage for borough legfel coefficients
+ for(i in 1:NB) {
+    m.x <- lm(Purprice~FlorArea,data=MyData[MyData$Borough == Bname[i],])
+    results[i,] <- coef(m.x)
+ }
+rownames(results) <- Bname                   # add in names
+colnames(results) <- c("Intercept","FlorArea")
+print(results)
+hist(results[,2])                            # look at FlorArea coefficient
+boxplot(results[,2])
+```
+
+### borough levels plots with legend
+```{r}
+quickMap2 <- function(Var,nClass=9,dp=0,plotNames=FALSE){
+   require(classInt)
+   require(RColorBrewer)
+   Classes <- classIntervals(Var,nClass,method="quantile",dataPrecision=dp)
+   Palette <- brewer.pal(nClass,"Reds")
+   Colours <- findColours(Classes,Palette)
+   plot(LB,col=Colours)
+   legend("bottomright",
+      legend=names(attr(Colours,"table")),
+      fill=attr(Colours,"palette"),
+      cex=0.75,bty="n")
+   box()
+   if(plotNames) {
+      xy <- coordinates(LB)
+      text(xy[,1],xy[,2],Bname,col="blue",cex=0.5)
+   }
+}
+
+quickMap2(results[,2])                    # without borough names
+quickMap2(results[,2],plotNames=TRUE)     # with borough names
+```
+
+### and the residuals from the model? Plot the borough medians
+```{r}
+quickMap2(tapply(MyData$stdres.9v,MyData$Borough,median),plotNames=TRUE,dp=3)
+```
