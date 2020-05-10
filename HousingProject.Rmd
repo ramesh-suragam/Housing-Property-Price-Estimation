@@ -155,7 +155,7 @@ stepAIC(m.tr2)
 ```{r}
 library(rgdal)
 library(rgeos)
-LB <- readOGR(dsn=".",layer="LondonBoroughs/LondonBoroughs",stringsAsFactors=FALSE)
+LB <- readOGR(dsn="LondonBoroughs",layer="LondonBoroughs",stringsAsFactors=FALSE)
 LH <- SpatialPointsDataFrame(MyData[,1:2],MyData)
 proj4string(LH) <- CRS(proj4string(LB))
 plot(LB)
