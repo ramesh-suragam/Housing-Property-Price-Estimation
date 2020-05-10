@@ -1,0 +1,208 @@
+---
+title: "HousingProject"
+author: "Ramesh Suragam, Nishant Kumar, Pawan Rakesh, Alok kumar"
+date: "5/10/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Property Cost Project
+### Read the data
+```{r}
+LondonData <- read.csv("DataScienceProj.csv",stringsAsFactors=FALSE)
+```
+
+print(dim(LondonData))
+head(LondonData)
+str(LondonData)
+summary(LondonData)
+### suspicious values for RetiPct, Unemploy
+
+###
+### large hosues costs more
+###
+plot(LondonData[,c("FlorArea","Purprice")],pch=16,cex=0.5)
+lines(lowess(LondonData[,c("FlorArea","Purprice")]),col="red")
+
+###
+### Convert dummies to factors
+###  - more convenient for modelling
+###
+Dummy2Factor <- function(mat,lev1="Level1") {
+      mat <- as.matrix(mat)
+      factor((mat %*% (1:ncol(mat))) + 1,
+          labels = c(lev1, colnames(mat)))
+}
+
+Age      <- Dummy2Factor(LondonData[,5:9],"PreWW1")
+Type     <- Dummy2Factor(LondonData[,10:12],"Others")
+Garage   <- Dummy2Factor(LondonData[,13:14],"HardStnd")
+Bedrooms <- Dummy2Factor(LondonData[,18:21],"BedOne")
+
+MyData <- data.frame(LondonData[,c(2:4,15:17,22,23,26)],Age,Type,Garage,Bedrooms)
+summary(MyData)
+
+###
+### Fit models for a single variable and look at AICs
+###  - model with *lowest* AIC is closest to unknown 'true' model
+AICs <- rep(NA,10)
+Models <- vector("list",10)
+Vars <- colnames(MyData)[4:13]
+for(i in 1:10) {
+      Models[[i]] <- lm(formula(paste0("Purprice~",Vars[i])),data=MyData)
+      AICs[i] <- AIC(Models[[i]])
+}
+print(AICs)
+minAIC <- which.min(AICs)
+print(AICs[minAIC])
+print(Vars[minAIC])
+summary(Models[[minAIC]])
+
+###
+### Evidence in favour of the model
+###
+### see Burnham and Anderson p70-78
+###
+delta <- AICs - min(AICs)                      # differences
+w     <- exp(-0.5*delta)/sum(exp(-0.5*delta))  # probabilitiies
+w
+
+
+###
+### Next model
+###
+AICs <- rep(NA,9)
+Models <- vector("list",9)
+Vars <- Vars[-minAIC]
+for(i in 1:9) {
+      Models[[i]] <- lm(formula(paste0("Purprice~FlorArea+",Vars[i])),data=MyData)
+      AICs[i] <- AIC(Models[[i]])
+}
+print(AICs)
+minAIC <- which.min(AICs)
+print(AICs[minAIC])
+print(Vars[minAIC])
+summary(Models[[minAIC]])
+
+AICs <- rep(NA,8)
+Models <- vector("list",8)
+Vars <- Vars[-minAIC]
+for(i in 1:8) {
+      Models[[i]] <- lm(formula(paste0("Purprice~FlorArea+Type+",Vars[i])),data=MyData)
+      AICs[i] <- AIC(Models[[i]])
+}
+print(AICs)
+minAIC <- which.min(AICs)
+print(AICs[minAIC])
+print(Vars[minAIC])
+summary(Models[[minAIC]])
+
+
+AICs <- rep(NA,7)
+Models <- vector("list",7)
+Vars <- Vars[-minAIC]
+for(i in 1:7) {
+      Models[[i]] <- lm(formula(paste0("Purprice~FlorArea+Type+BathTwo+",Vars[i])),data=MyData)
+      AICs[i] <- AIC(Models[[i]])
+}
+print(AICs)
+minAIC <- which.min(AICs)
+print(AICs[minAIC])
+print(Vars[minAIC])
+summary(Models[[minAIC]])
+
+###
+### Another way
+###
+library(MASS)
+
+price.lm   <- lm(Purprice~FlorArea+Type+BathTwo+CenHeat+Age+Bedrooms+ProfPct, data=MyData)
+price.step <- stepAIC(price.lm)
+summary(price.step)
+
+
+price.lm2   <- lm(Purprice~Easting+Northing+FlorArea+Type+BathTwo+CenHeat+Age+Bedrooms+ProfPct, data=MyData)
+price.step2 <- stepAIC(price.lm2)
+summary(price.step2)
+
+library(classInt)
+library(RColorBrewer)
+
+nClass = 10
+Palette <- rev(brewer.pal(nClass,"Spectral"))
+Classes <- classIntervals(MyData$Purprice,nClass,"quantile")
+Colours <- findColours(Classes,Palette)
+plot(MyData$Easting,MyData$Northing,pch=16,cex=0.25,col=Colours,asp=1)
+
+
+###
+### Geography
+###
+x <- MyData$Easting/1000
+y <- MyData$Northing/1000
+m.tr1 <- lm(Purprice~x+y,data=MyData)
+AIC(m.tr1)
+m.tr2 <- lm(Purprice~x+y+I(x^2)+I(y^2)+I(x*y),data=MyData)
+AIC(m.tr2)
+summary(m.tr1) # lower prices as we move east, slightly lower as w move south
+summary(m.tr2) # lower AIC # higher price as we move west
+stepAIC(m.tr2)
+
+###
+### More geography
+###
+library(rgdal)
+library(rgeos)
+LB <- readOGR(dsn=".",layer="LondonBoroughs",stringsAsFactors=FALSE)
+LH <- SpatialPointsDataFrame(MyData[,1:2],MyData)
+proj4string(LH) <- CRS(proj4string(LB))
+plot(LB)
+points(LH,pch=16,cex=0.5)
+box()
+
+###
+### Add Brough names to data
+###
+LHLB <- over(LH,LB)   # points first, then polygons
+dim(LHLB)
+head(LHLB)
+MyData$Borough <- gsub(" London Boro","",LHLB$NAME)
+
+boxplot(Purprice~Borough,data=MyData)
+Boroughs <- names(table(MyData$Borough))
+NB <- length(Boroughs)
+boxplot(log(Purprice)~Borough,data=MyData,outpch=16,outcol="red",outcex=0.75,xaxt="n")
+axis(1,labels=Boroughs,at=1:NB,cex.axis=0.75,las=2)
+title("Log(Price) by Borough")
+
+###
+### Map of Boroughs with names
+###
+head(LB$NAME)
+Bname <- gsub(" London Boro","",LB$NAME)
+xy <- coordinates(LB)
+plot(LB)
+text(xy[,1],xy[,2],Bname,col="blue",cex=0.5)
+box()
+title("London Borough Boundaries")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
