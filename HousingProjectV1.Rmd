@@ -1,0 +1,63 @@
+---
+title: "HousingProjectV1"
+author: "Ramesh Suragam Alok Kumar Nishant Kumar Pawan Rakesh"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(ggplot2)
+```
+
+
+
+### Property Cost Project
+### Read the data
+```{r}
+library(MASS)
+LondonData <- read.csv("data/DataScienceProj.csv",stringsAsFactors=FALSE)
+head(LondonData)
+summary(LondonData)
+LondonData <- LondonData[LondonData$Purprice < 600000,]
+```
+
+
+
+## Data Cleaning
+```{r}
+Dummy2Factor <- function(mat,lev1="Level1") {
+      mat <- as.matrix(mat)
+      factor((mat %*% (1:ncol(mat))) + 1,
+          labels = c(lev1, colnames(mat)))
+}
+
+Age      <- Dummy2Factor(LondonData[,5:9],"PreWW1")
+Type     <- Dummy2Factor(LondonData[,10:12],"Others")
+Garage   <- Dummy2Factor(LondonData[,13:14],"HardStnd")
+Bedrooms <- Dummy2Factor(LondonData[,18:21],"BedOne")
+
+MyData <- data.frame(LondonData[,c(2:4,15:17,22,23,26)],Age,Type,Garage,Bedrooms)
+head(MyData)
+```
+
+```{r}
+set.seed(1) 
+s <- sample(nrow(MyData), round(.5*nrow(MyData)))
+train_MyData <- MyData[s,]
+test_MyData <- MyData[-s,]
+
+MyData$Purprice <- as.factor(MyData$Purprice)
+pairs(train_MyData)
+```
+
+
+## creating model
+```{r}
+reg_model <- glm(Purprice ~ ., data = train_MyData)
+step(glm(Purprice ~ ., data = train_MyData),direction = "both")
+summary(reg_model)
+```
+
