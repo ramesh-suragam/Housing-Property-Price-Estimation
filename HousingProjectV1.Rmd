@@ -61,3 +61,17 @@ step(glm(Purprice ~ ., data = train_MyData),direction = "both")
 summary(reg_model)
 ```
 
+```{r}
+library(randomForest)
+fit <- randomForest(Purprice ~.,
+          data = train_MyData,importance=TRUE,ntree=60)
+
+importance.features <- tibble::rownames_to_column(data.frame(fit$importance[,c(1)]))
+colnames(importance.features) <- c("rowname", "value")
+
+ggplot(importance.features, aes(x = reorder(rowname, -value), y = value)) +
+  geom_bar(stat = "identity", position = "dodge", fill="#E69F00", colour="black") +
+  xlab("Feature") + ylab("Count") + ggtitle("Importance of a feature: Simple Random Forest classifier") +
+  coord_flip()
+```
+
