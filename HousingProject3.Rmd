@@ -136,14 +136,20 @@ grid.arrange(p10, p11, nrow=2)
 ```
 
 ```{r}
-ld_model <- lm(Purprice~., data = MyData)
+ld_model <- lm(Purprice~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms, data = MyData)
 step <- stepAIC(ld_model, direction="both")
 step$anova
 ```
 
 ```{r}
 library(leaps)
-ld_model <- regsubsets(Purprice~., data = MyData, method = "forward",nvmax = 10)
+
+set.seed(123)
+sample <- sample(c(TRUE, FALSE), nrow(MyData), replace = T, prob = c(0.6,0.4))
+train <- MyData[sample, ]
+test <- MyData[!sample, ]
+
+ld_model <- regsubsets(Purprice~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms, data = train,nvmax = 10)
 results <- summary(ld_model)
 plot(ld_model,scale="adjr2")
 
@@ -162,10 +168,112 @@ which.max(results$adjr2)
 which.min(results$bic)
 which.min(results$cp)
 
+ld_frwd <- regsubsets(Purprice~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms, data = train, method = "forward",nvmax = 10)
+results <- summary(ld_frwd)
+plot(ld_frwd,scale="adjr2")
+
+# extract and plot results
+tibble(predictors = 1:10,
+       adj_R2 = results$adjr2,
+       Cp = results$cp,
+       BIC = results$bic) %>%
+  gather(statistic, value, -predictors) %>%
+  ggplot(aes(predictors, value, color = statistic)) +
+  geom_line(show.legend = F) +
+  geom_point(show.legend = F) +
+  facet_wrap(~ statistic, scales = "free")
+
+which.min(results$cp)
+
+ld_bkwd <- regsubsets(Purprice~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms, data = train, method = "backward",nvmax = 10)
+results <- summary(ld_bkwd)
+plot(ld_bkwd,scale="adjr2")
+
+# extract and plot results
+tibble(predictors = 1:10,
+       adj_R2 = results$adjr2,
+       Cp = results$cp,
+       BIC = results$bic) %>%
+  gather(statistic, value, -predictors) %>%
+  ggplot(aes(predictors, value, color = statistic)) +
+  geom_line(show.legend = F) +
+  geom_point(show.legend = F) +
+  facet_wrap(~ statistic, scales = "free")
+
+which.min(results$cp)
+
+coef(ld_model,10)
+coef(ld_frwd,10)
+coef(ld_bkwd,10)
+
+test_m <- model.matrix(Purprice ~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms, data = test)
+
+validation_errors <- vector("double", length = 10)
+
+for(i in 1:10) {
+  coef_x <- coef(ld_model, id = i)                     # extract coefficients for model size i
+  pred_x <- test_m[ , names(coef_x)] %*% coef_x           # predict salary using matrix algebra
+  validation_errors[i] <- mean((test$Purprice - pred_x)^2)  # compute test error btwn actual & predicted salary
+}
+plot(validation_errors, type = "b")
+
+for(i in 1:10) {
+  coef_x <- coef(ld_frwd, id = i)                     # extract coefficients for model size i
+  pred_x <- test_m[ , names(coef_x)] %*% coef_x           # predict salary using matrix algebra
+  validation_errors[i] <- mean((test$Purprice - pred_x)^2)  # compute test error btwn actual & predicted salary
+}
+plot(validation_errors, type = "b")
+
+for(i in 1:10) {
+  coef_x <- coef(ld_bkwd, id = i)                     # extract coefficients for model size i
+  pred_x <- test_m[ , names(coef_x)] %*% coef_x           # predict salary using matrix algebra
+  validation_errors[i] <- mean((test$Purprice - pred_x)^2)  # compute test error btwn actual & predicted salary
+}
+
+# plot validation errors
+plot(validation_errors, type = "b")
+
 # ld_model <- lm(Purprice~FlorArea+BathTwo+CenHeat+Type,data = MyData)
 # # ld_model <- lm(Purprice~FlorArea+BathTwo+CenHeat+Type+Easting+Bedrooms+Age,data = MyData)
 # summary(ld_model)
+
+predict.regsubsets <- function(object, newdata, id ,...) {
+  form <- as.formula(object$call[[2]]) 
+  mat <- model.matrix(form, newdata)
+  coefi <- coef(object, id = id)
+  xvars <- names(coefi)
+  mat[, xvars] %*% coefi
+}
+
+k <- 10
+set.seed(1)
+folds <- sample(1:k, nrow(MyData), replace = TRUE)
+cv_errors <- matrix(NA, k, 15, dimnames = list(NULL, paste(1:15)))
+
+for(j in 1:k) {
+  
+  # perform best subset on rows not equal to j
+  ld_model <- regsubsets(Purprice ~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms, MyData[folds != j, ], nvmax = 15)
+  
+  # perform cross-validation
+  for( i in 1:15) {
+    pred_x <- predict.regsubsets(ld_model, MyData[folds == j, ], id = i)
+    cv_errors[j, i] <- mean((MyData$Purprice[folds == j] - pred_x)^2)
+    }
+}
+
+mean_cv_errors <- colMeans(cv_errors)
+
+plot(mean_cv_errors, type = "b")
+
+final_best <- regsubsets(Purprice ~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms, data = MyData , nvmax = 15)
+coef(final_best, 15)
 ```
+
+```{r}
+MyData
+```
+
 
 
 
