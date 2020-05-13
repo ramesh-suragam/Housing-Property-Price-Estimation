@@ -15,6 +15,7 @@ suppressMessages(suppressWarnings(library(tidyverse)))
 suppressMessages(suppressWarnings(library(ggplot2)))
 suppressMessages(suppressWarnings(library(gridExtra)))
 suppressMessages(suppressWarnings(library(MASS)))
+suppressMessages(suppressWarnings(library(randomForest)))
 ```
 
 ### **Introduction:**
@@ -66,6 +67,7 @@ head(MyData)
 ```{r}
 par(mfrow= c(2,2))
 boxplot(MyData$Purprice)
+# From boxplot we can see that purprice greater then 600000 is an outlier so we will remove that
 MyData <- MyData[MyData$Purprice<600000,]
 
 boxplot(Purprice~CenHeat,data=MyData)
@@ -95,6 +97,11 @@ p3 <- ggplot(MyData, aes(x=log(Purprice))) +
 
 grid.arrange(p1, p2, p3, nrow=3)
 ```
+
+
+
+From the plots we can see that it is skewed towards the left so we can say that to make it a normal distribution we have to apply some transformation. After applying log transformation on purprice we see that purprice is normally distributed.
+
 
 ```{r}
 p4 <- ggplot(MyData, aes(x=log(Purprice), color=MyData$CenHeat)) +
@@ -135,8 +142,8 @@ grid.arrange(p8, p9, nrow=2)
 grid.arrange(p10, p11, nrow=2)
 ```
 
-```{r}
-ld_model <- lm(Purprice~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms, data = MyData)
+```{reval= FALSE}
+ld_model <- lm(log(Purprice)~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms, data = MyData)
 step <- stepAIC(ld_model, direction="both")
 step$anova
 ```
@@ -149,7 +156,7 @@ sample <- sample(c(TRUE, FALSE), nrow(MyData), replace = T, prob = c(0.6,0.4))
 train <- MyData[sample, ]
 test <- MyData[!sample, ]
 
-ld_model <- regsubsets(Purprice~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms, data = train,nvmax = 10)
+ld_model <- regsubsets(log(Purprice)~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms, data = train,nvmax = 10)
 results <- summary(ld_model)
 plot(ld_model,scale="adjr2")
 
@@ -168,7 +175,7 @@ which.max(results$adjr2)
 which.min(results$bic)
 which.min(results$cp)
 
-ld_frwd <- regsubsets(Purprice~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms, data = train, method = "forward",nvmax = 10)
+ld_frwd <- regsubsets(log(Purprice)~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms, data = train, method = "forward",nvmax = 10)
 results <- summary(ld_frwd)
 plot(ld_frwd,scale="adjr2")
 
@@ -185,7 +192,7 @@ tibble(predictors = 1:10,
 
 which.min(results$cp)
 
-ld_bkwd <- regsubsets(Purprice~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms, data = train, method = "backward",nvmax = 10)
+ld_bkwd <- regsubsets(log(Purprice)~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms, data = train, method = "backward",nvmax = 10)
 results <- summary(ld_bkwd)
 plot(ld_bkwd,scale="adjr2")
 
@@ -206,7 +213,7 @@ coef(ld_model,10)
 coef(ld_frwd,10)
 coef(ld_bkwd,10)
 
-test_m <- model.matrix(Purprice ~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms, data = test)
+test_m <- model.matrix(log(Purprice) ~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms, data = test)
 
 validation_errors <- vector("double", length = 10)
 
@@ -253,7 +260,7 @@ cv_errors <- matrix(NA, k, 15, dimnames = list(NULL, paste(1:15)))
 for(j in 1:k) {
   
   # perform best subset on rows not equal to j
-  ld_model <- regsubsets(Purprice ~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms, MyData[folds != j, ], nvmax = 15)
+  ld_model <- regsubsets(log(Purprice) ~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms, MyData[folds != j, ], nvmax = 15)
   
   # perform cross-validation
   for( i in 1:15) {
@@ -266,12 +273,21 @@ mean_cv_errors <- colMeans(cv_errors)
 
 plot(mean_cv_errors, type = "b")
 
-final_best <- regsubsets(Purprice ~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms, data = MyData , nvmax = 15)
+final_best <- regsubsets(log(Purprice) ~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms, data = MyData , nvmax = 15)
 coef(final_best, 15)
 ```
 
 ```{r}
-MyData
+fit <- randomForest(log(Purprice) ~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms,
+          data = train_MyData,importance=TRUE,ntree=60)
+
+importance.features <- tibble::rownames_to_column(data.frame(fit$importance[,c(1)]))
+colnames(importance.features) <- c("rowname", "value")
+
+ggplot(importance.features, aes(x = reorder(rowname, -value), y = value)) +
+  geom_bar(stat = "identity", position = "dodge", fill="#E69F00", colour="black") +
+  xlab("Feature") + ylab("Count") + ggtitle("Importance of a feature: Simple Random Forest classifier") +
+  coord_flip()
 ```
 
 
