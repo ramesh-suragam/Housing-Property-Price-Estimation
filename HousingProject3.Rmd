@@ -16,6 +16,7 @@ suppressMessages(suppressWarnings(library(ggplot2)))
 suppressMessages(suppressWarnings(library(gridExtra)))
 suppressMessages(suppressWarnings(library(MASS)))
 suppressMessages(suppressWarnings(library(randomForest)))
+library("PerformanceAnalytics")
 ```
 
 ### **Introduction:**
@@ -27,10 +28,13 @@ LondonData <- suppressMessages(suppressWarnings(read_csv("data/DataScienceProj.c
 head(LondonData)
 
 #Checking for correlation
-M <- cor(LondonData[,-1])
+M <- cor(LondonData[,c(4,23:31)])
 head(round(M,2))
 library(corrplot)
 corrplot(M, method="circle", type = "upper", order="hclust", sig.level = 0.01)
+chart.Correlation(M, histogram=TRUE, pch=19)
+col<- colorRampPalette(c("blue", "white", "red"))(20)
+heatmap(x = M, col = col, symm = TRUE)
 ```
 
 ### **Data Cleanup:**
