@@ -15,6 +15,7 @@ suppressMessages(suppressWarnings(library(tidyverse)))
 suppressMessages(suppressWarnings(library(ggplot2)))
 suppressMessages(suppressWarnings(library(gridExtra)))
 suppressMessages(suppressWarnings(library(MASS)))
+library("PerformanceAnalytics")
 ```
 
 ### **Introduction:**
@@ -26,10 +27,11 @@ LondonData <- suppressMessages(suppressWarnings(read_csv("data/DataScienceProj.c
 head(LondonData)
 
 #Checking for correlation
-M <- cor(LondonData[,-1])
+M <- cor(LondonData[,c(4,23:31)])
 head(round(M,2))
 library(corrplot)
 corrplot(M, method="circle", order="hclust", sig.level = 0.01)
+chart.Correlation(M, histogram=TRUE, pch=19)
 ```
 
 ### **Data Cleanup:**
@@ -143,7 +145,7 @@ step$anova
 
 ```{r}
 library(leaps)
-ld_model <- regsubsets(Purprice~., data = MyData, method = "forward",nvmax = 10)
+ld_model <- regsubsets(Purprice~., data = MyData, nvmax = 10)
 results <- summary(ld_model)
 plot(ld_model,scale="adjr2")
 
@@ -161,6 +163,29 @@ tibble(predictors = 1:10,
 which.max(results$adjr2)
 which.min(results$bic)
 which.min(results$cp)
+
+coef(ld_model,10)
+
+ld_model <- regsubsets(Purprice~., data = MyData, method = "forward", nvmax = 10)
+results <- summary(ld_model)
+plot(ld_model,scale="adjr2")
+
+# extract and plot results
+tibble(predictors = 1:10,
+       adj_R2 = results$adjr2,
+       Cp = results$cp,
+       BIC = results$bic) %>%
+  gather(statistic, value, -predictors) %>%
+  ggplot(aes(predictors, value, color = statistic)) +
+  geom_line(show.legend = F) +
+  geom_point(show.legend = F) +
+  facet_wrap(~ statistic, scales = "free")
+
+which.max(results$adjr2)
+which.min(results$bic)
+which.min(results$cp)
+
+coef(ld_model,10)
 
 # ld_model <- lm(Purprice~FlorArea+BathTwo+CenHeat+Type,data = MyData)
 # # ld_model <- lm(Purprice~FlorArea+BathTwo+CenHeat+Type+Easting+Bedrooms+Age,data = MyData)
