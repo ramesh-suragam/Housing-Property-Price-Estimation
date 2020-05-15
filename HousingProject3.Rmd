@@ -69,10 +69,12 @@ head(MyData)
 
 ### **Remove Outliers:**
 ```{r}
-par(mfrow= c(2,2))
-boxplot(MyData$Purprice)
+
+par(mfrow= c(1,2))
+boxplot(MyData$Purprice, col = 'orange')
 # From boxplot we can see that purprice greater then 600000 is an outlier so we will remove that
 MyData <- MyData[MyData$Purprice<600000,]
+boxplot(MyData$Purprice, col = 'orange')
 
 boxplot(Purprice~CenHeat,data=MyData)
 boxplot(Purprice~BathTwo,data=MyData)
@@ -146,8 +148,8 @@ grid.arrange(p8, p9, nrow=2)
 grid.arrange(p10, p11, nrow=2)
 ```
 
-```{reval= FALSE}
-ld_model <- lm(log(Purprice)~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms, data = MyData)
+```{r}
+ld_model <- lm(Purprice~Tenfree+CenHeat+BathTwo+NewPropD+FlorArea+ProfPct+Age+Type+Garage+Bedrooms, data = MyData)
 step <- stepAIC(ld_model, direction="both")
 step$anova
 ```
