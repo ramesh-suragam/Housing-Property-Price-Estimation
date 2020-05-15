@@ -131,7 +131,11 @@ p11 <- ggplot(MyData, aes(x=log(Purprice), color=MyData$Bedrooms)) +
   geom_freqpoly()+
   theme(legend.position = "top")
 
-grid.arrange(p4, p5, nrow=2)
+p12 <- ggplot(MyData, aes(x=log(Purprice), color=MyData$BathTwo)) +
+  geom_freqpoly()+
+  theme(legend.position = "top")
+
+grid.arrange(p5, p12, nrow=2)
 grid.arrange(p6, p7, nrow=2)
 grid.arrange(p8, p9, nrow=2)
 grid.arrange(p10, p11, nrow=2)
