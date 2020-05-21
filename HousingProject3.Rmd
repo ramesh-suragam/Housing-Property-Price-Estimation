@@ -1,8 +1,10 @@
 ---
-title: "HousingProject3"
-author: "Ramesh Suragam"
+title: "HOUSING PROPERTY PRICE ESTIMATION IN LONDON"
+author: "Nishant Kumar, Alok Kumar Singh, Ramesh Suragam, Pawan Rakesh Kumar Narayan Gowda"
 date: "5/11/2020"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
