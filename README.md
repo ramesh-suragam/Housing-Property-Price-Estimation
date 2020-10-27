@@ -6,9 +6,9 @@ It presents the recent trends in the housing market, including a review of the d
 
 As a part of exploratory analyses there are different Machine Learning techniques available in R. The project will help to establish the strong relationships between the house price for greater London using the parameter such as the central heating, floor area, Garage availability in the house, location, number of bedroom available and house price of other borough as well. With this project, we aim to answer the below question.
 
-•	Is floor area an important factor for house price?
-•	Is central heating an important criterion when considering to buy a house in greater London? (since UK, is considered to a cold country)
-•	Has the deregulation in the financial sector impacted other boroughs house price hike as well apart from London?
-•	Is the age of the house an important criterion when considering to buy a house in London?
-•	Is the availability of garage an important criterion when considering to buy a house in London?
-•	Is the number of bedrooms in the house is considered while buying the house and if this is impacting the house price of the London.
+* Is floor area an important factor for house price?
+* Is central heating an important criterion when considering to buy a house in greater London? (since UK, is considered to a cold country)
+* Has the deregulation in the financial sector impacted other boroughs house price hike as well apart from London?
+* Is the age of the house an important criterion when considering to buy a house in London?
+* Is the availability of garage an important criterion when considering to buy a house in London?
+* Is the number of bedrooms in the house is considered while buying the house and if this is impacting the house price of the London.
