@@ -12,3 +12,11 @@ As a part of exploratory analyses there are different Machine Learning technique
 * Is the age of the house an important criterion when considering to buy a house in London?
 * Is the availability of garage an important criterion when considering to buy a house in London?
 * Is the number of bedrooms in the house is considered while buying the house and if this is impacting the house price of the London.
+
+## Usage
+
+The RMD code needs to be pulled into RStudio while the LondonBoroughs folder contents include Shape(.shp) files needs to be imported into qgis.
+
+## Contributing
+
+Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
